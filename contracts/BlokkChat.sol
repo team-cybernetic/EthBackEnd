@@ -1,25 +1,32 @@
 pragma solidity ^0.4.2;
 
-import "truffle/Assert.sol";
-import "truffle/DeployedAddresses.sol";
+import "./BlokkCreator.sol";
 
 contract BlokkChat {
+	address[] subgroups;
+	address[] memberList;
+	string groupName;
+
+	function BlokkChat(string name) {
+		groupName = name;
+	}
 	
 	/// @notice create a joinable group with a custom ruleset
-	/// @param path the path to the context at which the group should be created
-	/// @param groupName the name of the group to be create
+	/// @param name the name of the group to be create
 	/// @return 1 on success, error code on failure
-	function createGroup(string path, string groupName) public returns (int) {
+	function createGroup(string name) public returns (int) {
+		BlokkCreator c = new BlokkCreator();
+		address newGroup = c.createGroup(name);
+		subgroups.push(newGroup);
 		return 1;
 	}
 
 	/// @notice adds a user to the member list for a group
 	/// @param user identifying string for user to be added
-	/// @param group full path to the group which is to be added
-	/// @param auth Authentication key to confirm privilege in order to perform moderation action(implementation to be determined)
 	/// @return 1 on success, error code on failure
-	function addMember(string user, string group, string auth) public returns (int) {
-		return 1;
+	function addMember(string user) public returns (int) {
+		//memberList.push(user);
+		return 0;
 	}
 
 	/// @notice purchase currency token for a group
@@ -96,8 +103,8 @@ contract BlokkChat {
 	/// @notice get the child groups/posts of given group/post
 	/// @param path the path to the group or post you wish to find children of
 	/// @return an array containing the children of the group/post
-	function getChildren(string path) public returns (string[]) {
-		return new string[](0);
+	function getChildren(string path) public returns (string) {
+		return "";
 	}
 
 	/// @notice spend tokens to "like" a post, increasing visibility and rewarding the posting user
@@ -123,8 +130,8 @@ contract BlokkChat {
 	/// @notice gets the number of members in a group
 	/// @param path the path to the group
 	/// @return a list of users of the group
-	function getUsers(string path) public returns (string[]){
-		return new string[](0);
+	function getUsers(string path) public returns (string){
+		return "";
 	}
 
 	/// @notice adds locked state to group, preventing new posts from being created

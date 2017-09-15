@@ -1,8 +1,9 @@
-var ConvertLib = artifacts.require("./ConvertLib.sol");
-var MetaCoin = artifacts.require("./MetaCoin.sol");
+var BlokkCreator = artifacts.require("./BlokkCreator.sol");
+var BlokkChat = artifacts.require("./BlokkChat.sol");
+
 
 module.exports = function(deployer) {
-  deployer.deploy(ConvertLib);
-  deployer.link(ConvertLib, MetaCoin);
-  deployer.deploy(MetaCoin);
+  deployer.deploy(BlokkCreator);
+  deployer.deploy(BlokkChat);
+  deployer.link(BlokkChat,BlokkCreator);
 };
