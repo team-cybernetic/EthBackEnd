@@ -1,56 +1,115 @@
 pragma solidity ^0.4.2;
 
-import "./BlokkCreator.sol";
 
 contract BlokkChat {
-	address[] subgroups;
-	address[] memberList;
-	string groupName;
 
-	function BlokkChat(string name) {
+	struct IpfsMultihash {
+        uint8 hashFunction; //first byte of multihash
+        uint8 hashLength; //second byte of multihash
+        bytes hash; //hashLength remaining bytes of multihash
+    }
+
+    uint256 postCount = 0;
+
+    struct Post {
+        string title; //length limit enforced by ruleset, must be unique, immutable
+        uint256 number; //unique, immutable
+        IpfsMultihash contentAddress; //required only if enforced by ruleset
+        address creator; //immutable
+        uint256 creationTime; //UNIX timestamp, accept user input bounded by block.timestamp, immutable
+        address groupAddress; //null when group has not been created for this post
+        uint256 balance; //amount of money owned by this post in this group
+        int256 permissions; //permission level of post
+    }
+
+    mapping (string => Post) postsByTitle;
+    mapping (address => Post[]) postsByCreator;
+    mapping (uint256 => Post) postsByNumber;
+
+    uint256 userCount = 0;
+
+    struct User {
+        string nickname; //length/uniqueness enforced by ruleset
+        uint256 number; //unique, immutable
+        IpfsMultihash profileAddress; //required only if enforced by ruleset
+        address addr; //public key, unique, immutable
+        uint256 joinTime; //UNIX timestamp when user first joined group, use block.timestamp, immutable
+        address directAddress; //null when user has not created/linked a private group (for direct messaging)
+        uint256 balance; //amount of money owned by this user in this group
+        int256 permissions; //permission level of user, permit negatives for banned/muted/etc type users, also use largest type to permit flags instead of linear values
+    }
+
+    mapping (address => User) usersByAddress; //maps ethereum addres (public key) to user objects
+	mapping (uint256 => User) usersByNumber;
+
+
+	address[] subgroups;
+	bytes32 groupName;
+
+	uint256 exchangeRate;
+
+
+	mapping(bytes32 => address) children;
+	BlokkChat parent;
+
+	function BlokkChat(bytes32 name) {
 		groupName = name;
 	}
 	
 	/// @notice create a joinable group with a custom ruleset
 	/// @param name the name of the group to be create
 	/// @return 1 on success, error code on failure
-	function createGroup(string name) public returns (int) {
-		BlokkCreator c = new BlokkCreator();
-		address newGroup = c.createGroup(name);
-		subgroups.push(newGroup);
-		return 1;
+	function createGroup(bytes32 name, address groupContract) public returns (int) {
+		children[name] = groupContract;
+	}
+
+	function setParent(BlokkChat newParent) public {
+		parent = newParent;
+	}
+
+	function getParent() public returns (BlokkChat) {
+		return parent;
 	}
 
 	/// @notice adds a user to the member list for a group
-	/// @param user identifying string for user to be added
-	/// @return 1 on success, error code on failure
-	function addMember(string user) public returns (int) {
-		//memberList.push(user);
-		return 0;
+	/// @return The number for the user if a user with the given address exists, null otherwise
+	function addMember(string nickname, uint256 number, address addr) public returns (uint256) {
+		if (usersByAddress[addr].addr == 0 && usersByNumber[number].addr == 0) {
+			User memory temp = User(nickname, number, IpfsMultihash(0,0,''), addr, 0, 0, 0, 0);
+			usersByAddress[addr] = temp;
+			usersByNumber[number] = temp;
+			return number;
+		} else {
+			if(usersByAddress[addr].addr == 0) {
+				return 0;
+			}
+			else {
+				return usersByAddress[addr].number;
+			}
+		}
+		
 	}
 
 	/// @notice purchase currency token for a group
-	/// @param amount the amount of eth to be converted into tokens
 	/// @return the number of tokens that have been purchased after conversion
-	function buyIn(uint amount) public returns (uint) {
-		return 0;
+	function buyIn() payable returns (uint) {
+		User storage recipient = usersByAddress[msg.sender];
+		recipient.balance += msg.value * exchangeRate;
+		return recipient.balance;
 	}
 
 	/// @notice exit a group you are currently a member of
-	/// @param user identifying string for user which wants to leave
-	/// @param group the path to the group that the user wishes to leave
-	/// @param auth authentication key to confirm privilege to leave group
 	/// @return 1 on success, error code on failure
-	function leaveGroup(string user, string group, string auth) public returns (int) {
+	function leaveGroup() public returns (int) {
+		User storage temp = usersByAddress[msg.sender];
+		withdrawalFunds(temp.balance);
+		temp.addr = 0;
+		temp.number = 0;
 		return 1;
 	}
 
+
 	/// @notice create a post
-	/// @param user identifying string for user that wants to create the post
-	/// @param group the path to the group that the user wants to post in
-	/// @param auth authentication key to confirm privilege to make the post
-	/// @param title the title of the post
-	/// @param body the body of the post
 	/// @return path to the created post
 	function createPost(string user, string group, string auth, string title, string body, string path) public returns (string) {
 		return "";
@@ -80,14 +139,13 @@ contract BlokkChat {
 	}
 
 	/// @notice converts the token holdings of the user into Ether to be withdrawn
-	/// @param group the group to be withdrawn from
-	/// @param amount the number of tokens the user would like to withdrawal
-	/// @param user the identifying string of the user
-	/// @param auth the authorization string to identify privilege
-	/// @param addr the Etherium wallet address for the funds to be transferred to
-	/// @return the resulting Eth to be credited to the user 
-	function withdrawalFunds(string group, uint amount, string user, string auth, address addr) public returns (uint) {
-		return 0;
+	/// @return the new balance of the user
+	function withdrawalFunds(uint amount) public returns (uint) {
+		User storage recipient = usersByAddress[msg.sender];
+		uint actualReceipt = amount / exchangeRate; //can only send a multiple of the exchangeRate...
+		recipient.balance -= actualReceipt * exchangeRate;
+		msg.sender.transfer(amount);
+		return recipient.balance;
 	}
 
 	/// @notice transfer token balance from one individual to another within a group
