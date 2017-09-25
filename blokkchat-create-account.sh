@@ -1,2 +1,2 @@
 #/bin/bash
-geth --datadir .ethereum-blokkchat $@ account new
+geth --datadir ~/.ethereum-blokkchat $@ account new
